@@ -82,12 +82,14 @@ class BookmarkModelView(BaseModelView):
         parsed_url = urlparse(model.url)
         netloc, scheme = parsed_url.netloc, parsed_url.scheme
         is_scheme_valid = scheme in ('http', 'https')
-        tag_text = []
         tag_tmpl = '<a class="btn btn-default" href="{1}">{0}</a>'
-        for tag in model.tags.split(','):
-            if tag:
-                tag_text.append(tag_tmpl.format(tag, url_for(
-                    'bookmark.index_view', flt2_tags_contain=tag)))
+        tag_text = [
+            tag_tmpl.format(
+                tag, url_for('bookmark.index_view', flt2_tags_contain=tag)
+            )
+            for tag in model.tags.split(',')
+            if tag
+        ]
         if not netloc:
             return Markup("""\
             {0.title}<br/>{2}<br/>{1}{0.description}
@@ -99,11 +101,11 @@ class BookmarkModelView(BaseModelView):
             netloc_tmpl = '<img src="{}{}"/> '
             res = netloc_tmpl.format(
                 'http://www.google.com/s2/favicons?domain=', netloc)
-        title = model.title if model.title else '&lt;EMPTY TITLE&gt;'
+        title = model.title or '&lt;EMPTY TITLE&gt;'
         open_in_new_tab = current_app.config.get('BUKUSERVER_OPEN_IN_NEW_TAB', False)
         if is_scheme_valid and open_in_new_tab:
             res += '<a href="{0.url}" target="_blank">{1}</a>'.format(model, title)
-        elif is_scheme_valid and not open_in_new_tab:
+        elif is_scheme_valid:
             res += '<a href="{0.url}">{1}</a>'.format(model, title)
         else:
             res += title
@@ -120,12 +122,11 @@ class BookmarkModelView(BaseModelView):
             res += '<br/>'
         if self.url_render_mode != 'netloc':
             res += tag_tmpl.format(
-                'netloc:{}'.format(netloc),
-                url_for('bookmark.index_view', flt2_url_netloc_match=netloc)
+                f'netloc:{netloc}',
+                url_for('bookmark.index_view', flt2_url_netloc_match=netloc),
             )
         res += ''.join(tag_text)
-        description = model.description
-        if description:
+        if description := model.description:
             res += '<br/>'
             res += description.replace('\n', '<br/>')
         return Markup(res)
@@ -171,9 +172,9 @@ class BookmarkModelView(BaseModelView):
             self._on_model_change(form, model, True)
             tags_in = model.tags
             if not tags_in.startswith(','):
-                tags_in = ',{}'.format(tags_in)
+                tags_in = f',{tags_in}'
             if not tags_in.endswith(','):
-                tags_in = '{},'.format(tags_in)
+                tags_in = f'{tags_in},'
             self.model.bukudb.add_rec(
                 url=model.url, title_in=model.title, tags_in=tags_in, desc=model.description)
         except Exception as ex:
@@ -332,8 +333,7 @@ class BookmarkModelView(BaseModelView):
         return res
 
     def scaffold_form(self):
-        cls = forms.BookmarkForm
-        return cls
+        return forms.BookmarkForm
 
     def update_model(self, form, model):
         res = False
@@ -344,9 +344,9 @@ class BookmarkModelView(BaseModelView):
             self.bukudb.delete_tag_at_index(model.id, original_tags)
             tags_in = model.tags
             if not tags_in.startswith(','):
-                tags_in = ',{}'.format(tags_in)
+                tags_in = f',{tags_in}'
             if not tags_in.endswith(','):
-                tags_in = '{},'.format(tags_in)
+                tags_in = f'{tags_in},'
             res = self.bukudb.update_rec(
                 model.id, url=model.url, title_in=model.title, tags_in=tags_in,
                 desc=model.description)
@@ -374,14 +374,20 @@ class TagModelView(BaseModelView):
 
     def _name_formatter(self, context, model, name):
         data = getattr(model, name)
-        if not data:
-            return Markup('<a href="{}">{}</a>'.format(
-                url_for('bookmark.index_view', flt2_tags_number_equal=0),
-                '&lt;EMPTY TAG&gt;'
-            ))
-        return Markup('<a href="{}">{}</a>'.format(
-            url_for('bookmark.index_view', flt1_tags_contain=data), data
-        ))
+        return (
+            Markup(
+                '<a href="{}">{}</a>'.format(
+                    url_for('bookmark.index_view', flt1_tags_contain=data), data
+                )
+            )
+            if data
+            else Markup(
+                '<a href="{}">{}</a>'.format(
+                    url_for('bookmark.index_view', flt2_tags_number_equal=0),
+                    '&lt;EMPTY TAG&gt;',
+                )
+            )
+        )
 
     can_create = False
     can_set_page_size = True
@@ -441,8 +447,7 @@ class TagModelView(BaseModelView):
 
     def get_one(self, id):
         tags = self.bukudb.get_tag_all()[1]
-        tag_sns = SimpleNamespace(name=id, usage_count=tags[id])
-        return tag_sns
+        return SimpleNamespace(name=id, usage_count=tags[id])
 
     def scaffold_filters(self, name):
         res = []

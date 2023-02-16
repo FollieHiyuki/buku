@@ -36,13 +36,13 @@ def not_in_list_func(query, value, index):
 
 
 def top_x_func(query, value, index):
-    items = sorted(set(x[index] for x in query), reverse=True)
+    items = sorted({x[index] for x in query}, reverse=True)
     top_x = items[:value]
     return filter(lambda x: x[index] in top_x, query)
 
 
 def bottom_x_func(query, value, index):
-    items = sorted(set(x[index] for x in query), reverse=False)
+    items = sorted({x[index] for x in query}, reverse=False)
     top_x = items[:value]
     return filter(lambda x: x[index] in top_x, query)
 
@@ -87,7 +87,7 @@ class TagBaseFilter(BaseFilter):
         elif name == 'usage_count':
             self.index = 1
         else:
-            raise ValueError('name: {}'.format(name))
+            raise ValueError(f'name: {name}')
         self.filter_type = None
         if filter_type:
             self.apply_func = filter_type.value['func']
@@ -108,9 +108,7 @@ class TagBaseFilter(BaseFilter):
             value = int(value)
             if self.filter_type in (FilterType.TOP_X, FilterType.BOTTOM_X) and value < 1:
                 raise ValueError
-        if isinstance(value, str):
-            return value.strip()
-        return value
+        return value.strip() if isinstance(value, str) else value
 
 
 class BookmarkBukuFilter(BaseFilter):
@@ -130,13 +128,8 @@ class BookmarkBukuFilter(BaseFilter):
         super().__init__('buku', *args, **kwargs)
 
     def operation(self):
-        parts = []
-        for key, value in self.keys.items():
-            if getattr(self, key):
-                parts.append(value)
-        if not parts:
-            return 'search'
-        return 'search ' + ', '.join(parts)
+        parts = [value for key, value in self.keys.items() if getattr(self, key)]
+        return 'search ' + ', '.join(parts) if parts else 'search'
 
     def apply(self, query, value):
         return query
@@ -160,7 +153,7 @@ class BookmarkBaseFilter(BaseFilter):
         if name in bm_fields_dict:
             self.index = bm_fields_dict[name]
         else:
-            raise ValueError('name: {}'.format(name))
+            raise ValueError(f'name: {name}')
         self.filter_type = None
         if filter_type:
             self.apply_func = filter_type.value['func']
@@ -180,9 +173,7 @@ class BookmarkBaseFilter(BaseFilter):
             value = int(value)
             if self.filter_type in (FilterType.TOP_X, FilterType.BOTTOM_X) and value < 1:
                 raise ValueError
-        if isinstance(value, str):
-            return value.strip()
-        return value
+        return value.strip() if isinstance(value, str) else value
 
 
 class BookmarkTagNumberEqualFilter(BookmarkBaseFilter):

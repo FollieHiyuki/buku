@@ -49,11 +49,7 @@ def test_load_full_entry():
     # Act
     items = import_firefox_json(data)
 
-    # Assert
-    result = []
-    for item in items:
-        result.append(item)
-
+    result = list(items)
     assert len(result) == 1
     assert result[0][0] == 'http://uri.com/abc?234&536'
     assert result[0][1] == 'entry title'
@@ -86,12 +82,8 @@ def test_load_no_typecode():
     # Act
     items = import_firefox_json(data)
 
-    # Assert
-    result = []
-    for item in items:
-        result.append(item)
-
-    assert len(result) == 0
+    result = list(items)
+    assert not result
 
 
 def test_load_invalid_typecode():
@@ -114,12 +106,8 @@ def test_load_invalid_typecode():
     # Act
     items = import_firefox_json(data)
 
-    # Assert
-    result = []
-    for item in items:
-        result.append(item)
-
-    assert len(result) == 0
+    result = list(items)
+    assert not result
 
 def test_load_folder_with_no_children():
     """test method."""
@@ -134,12 +122,8 @@ def test_load_folder_with_no_children():
     # Act
     items = import_firefox_json(data)
 
-    # Assert
-    result = []
-    for item in items:
-        result.append(item)
-
-    assert len(result) == 0
+    result = list(items)
+    assert not result
 
 def test_load_one_child():
     """test method."""
@@ -171,11 +155,7 @@ def test_load_one_child():
     # Act
     items = import_firefox_json(data)
 
-    # Assert
-    result = []
-    for item in items:
-        result.append(item)
-
+    result = list(items)
     assert len(result) == 1
     assert result[0][0] == 'http://uri1'
     assert result[0][1] == 'title1'
@@ -205,12 +185,8 @@ def test_load_one_container_child():
     # Act
     items = import_firefox_json(data)
 
-    # Assert
-    result = []
-    for item in items:
-        result.append(item)
-
-    assert len(result) == 0
+    result = list(items)
+    assert not result
 
 def test_load_many_children():
     """test method."""
@@ -236,11 +212,7 @@ def test_load_many_children():
     # Act
     items = import_firefox_json(data)
 
-    # Assert
-    result = []
-    for item in items:
-        result.append(item)
-
+    result = list(items)
     assert len(result) == 3
 
 def test_load_container_no_title():
@@ -264,11 +236,7 @@ def test_load_container_no_title():
     # Act
     items = import_firefox_json(data, add_bookmark_folder_as_tag=True)
 
-    # Assert
-    result = []
-    for item in items:
-        result.append(item)
-
+    result = list(items)
     assert len(result) == 1
     assert result[0][0] == 'http://uri.com'
     assert result[0][2] == ',<no title>,'
@@ -295,11 +263,7 @@ def test_load_hierarchical_container_without_ignore():
     # Act
     items = import_firefox_json(data, add_bookmark_folder_as_tag=True)
 
-    # Assert
-    result = []
-    for item in items:
-        result.append(item)
-
+    result = list(items)
     assert len(result) == 1
     assert result[0][0] == 'http://uri.com'
     assert result[0][2] == ',title,'
@@ -334,11 +298,7 @@ def test_load_hierarchical_container_with_ignore():
     # Act
     items = import_firefox_json(data, add_bookmark_folder_as_tag=True)
 
-    # Assert
-    result = []
-    for item in items:
-        result.append(item)
-
+    result = list(items)
     assert len(result) == 2
     assert result[0][0] == 'http://uri1.com/#more-74'
     assert result[1][0] == 'http://uri4.com/#more-74'
@@ -370,12 +330,8 @@ def test_load_separator():
     # Act
     items = import_firefox_json(data)
 
-    # Assert
-    result = []
-    for item in items:
-        result.append(item)
-
-    assert len(result) == 0
+    result = list(items)
+    assert not result
 
 def test_load_multiple_tags():
     """test method."""
@@ -405,10 +361,6 @@ def test_load_multiple_tags():
     # Act
     items = import_firefox_json(data)
 
-    # Assert
-    result = []
-    for item in items:
-        result.append(item)
-
+    result = list(items)
     assert len(result) == 1
     assert result[0][2] == ",tag1,tag2,"

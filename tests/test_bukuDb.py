@@ -284,7 +284,7 @@ class TestBukuDb(unittest.TestCase):
 
         for i, tags in tags_by_index:
             # get the first tag from the bookmark
-            to_delete = re.match(",.*?,", tags).group(0)
+            to_delete = re.match(",.*?,", tags)[0]
             self.bdb.delete_tag_at_index(i, to_delete)
             # get updated tags from db
             from_db = get_tags_at_idx(i)
@@ -351,12 +351,12 @@ class TestBukuDb(unittest.TestCase):
         for i, bookmark in enumerate(self.bookmarks):
             tag_search = get_first_tag(bookmark)
             # search by the domain name for url
-            url_search = re.match(r"https?://(.*)?\..*", bookmark[0]).group(1)
+            url_search = re.match(r"https?://(.*)?\..*", bookmark[0])[1]
             title_search = bookmark[1]
             # Expect a five-tuple containing all bookmark data
             # db index, URL, title, tags, description
             expected = [(i + 1,) + tuple(bookmark)]
-            expected[0] += tuple([0])
+            expected[0] += (0, )
             # search db by tag, url (domain name), and title
             for keyword in (tag_search, url_search, title_search):
                 with mock.patch("buku.prompt"):
@@ -377,7 +377,7 @@ class TestBukuDb(unittest.TestCase):
                 # Expect a five-tuple containing all bookmark data
                 # db index, URL, title, tags, description
                 expected = [(i + 1,) + tuple(bookmark)]
-                expected[0] += tuple([0])
+                expected[0] += (0, )
                 self.assertEqual(results, expected)
 
     @vcr.use_cassette(
@@ -631,7 +631,7 @@ class TestBukuDb(unittest.TestCase):
             self.bdb.add_rec(*bookmark)
 
         # simulate user input, select range of indices 1-3
-        index_range = "1-%s" % len(self.bookmarks)
+        index_range = f"1-{len(self.bookmarks)}"
         with mock.patch("builtins.input", side_effect=[index_range]):
             with mock.patch("buku.browse") as mock_browse:
                 try:
@@ -791,10 +791,7 @@ def refreshdb_fixture():
     if exists(TEST_TEMP_DBFILE_PATH):
         os.remove(TEST_TEMP_DBFILE_PATH)
 
-    bdb = BukuDb()
-
-    yield bdb
-
+    yield BukuDb()
     # Teardown
     os.environ["XDG_DATA_HOME"] = TEST_TEMP_DIR_PATH
 
@@ -816,7 +813,7 @@ def test_refreshdb(refreshdb_fixture, title_in, exp_res):
     bdb.add_rec(*args)
     bdb.refreshdb(1, 1)
     from_db = bdb.get_rec_by_id(1)
-    assert from_db[2] == exp_res, "from_db: {}".format(from_db)
+    assert from_db[2] == exp_res, f"from_db: {from_db}"
 
 
 @pytest.fixture
@@ -957,9 +954,13 @@ def test_delete_rec_range_and_delay_commit(
 ):
     """test delete rec, range and delay commit."""
     bdb = BukuDb(dbfile=tmp_path / "tmp.db")
-    kwargs = {"is_range": True, "low": low, "high": high, "delay_commit": delay_commit}
-    kwargs["index"] = 0
-
+    kwargs = {
+        "is_range": True,
+        "low": low,
+        "high": high,
+        "delay_commit": delay_commit,
+        "index": 0,
+    }
     # Fill bookmark
     for bookmark in TEST_BOOKMARKS:
         bdb.add_rec(*bookmark)
@@ -1002,10 +1003,7 @@ def test_delete_rec_index_and_delay_commit(index, delay_commit, input_retval):
 
     if n_index < 0:
         assert not res
-    elif n_index > db_len:
-        assert not res
-        assert len(bdb.get_rec_all()) == db_len
-    elif index == 0 and input_retval != "y":
+    elif n_index > db_len or index == 0 and input_retval != "y":
         assert not res
         assert len(bdb.get_rec_all()) == db_len
     else:
@@ -1172,16 +1170,13 @@ def test_update_rec_invalid_tag(caplog, invalid_tag):
         assert caplog.records[0].getMessage() == "Please specify a tag"
         assert caplog.records[0].levelname == "ERROR"
     except IndexError as e:
-        if (sys.version_info.major, sys.version_info.minor) == (3, 4):
-            print("caplog records: {}".format(caplog.records))
-            for idx, record in enumerate(caplog.records):
-                print(
-                    "idx:{};{};message:{};levelname:{}".format(
-                        idx, record, record.getMessage(), record.levelname
-                    )
-                )
-        else:
+        if (sys.version_info.major, sys.version_info.minor) != (3, 4):
             raise e
+        print(f"caplog records: {caplog.records}")
+        for idx, record in enumerate(caplog.records):
+            print(
+                f"idx:{idx};{record};message:{record.getMessage()};levelname:{record.levelname}"
+            )
 
 
 @pytest.mark.parametrize(
@@ -1248,16 +1243,14 @@ def test_browse_by_index(low, high, index, is_range, empty_database):
             assert res
         elif is_range:
             assert not res
-        elif not is_range and index < 0:
+        elif index < 0:
             assert not res
-        elif not is_range and index > db_len:
+        elif index > db_len:
             assert not res
-        elif not is_range and index >= 0 and empty_database:
+        elif empty_database:
             assert not res
-        elif not is_range and 0 <= index <= db_len and not empty_database:
-            assert res
         else:
-            raise ValueError
+            assert res
         bdb.delete_rec_all()
 
 
@@ -1298,7 +1291,7 @@ def test_load_chrome_database(chrome_db, add_pt):
     if dump_data:
         with open(res_yaml_file, "w", encoding="utf8", errors="surrogateescape") as f:
             yaml.dump(call_args_list_dict, f)
-        print("call args list dict dumped to:{}".format(res_yaml_file))
+        print(f"call args list dict dumped to:{res_yaml_file}")
 
 
 @pytest.fixture()
@@ -1341,7 +1334,7 @@ def test_load_firefox_database(firefox_db, add_pt):
     if dump_data:
         with open(res_yaml_file, "w", encoding="utf8", errors="surrogateescape") as f:
             yaml.dump(call_args_list_dict, f)
-        print("call args list dict dumped to:{}".format(res_yaml_file))
+        print(f"call args list dict dumped to:{res_yaml_file}")
 
 
 @pytest.mark.parametrize(
@@ -1472,19 +1465,18 @@ def normalize_range(db_len, low, high):
     if low == "max" and high == "max":
         n_low = db_len
         n_high = max_value
-    elif low == "max" and high != "max":
+    elif low == "max":
         n_low = high
         n_high = max_value
-    elif low != "max" and high == "max":
+    elif high == "max":
         n_low = low
         n_high = max_value
     else:
         n_low = low
         n_high = high
 
-    if require_comparison:
-        if n_high < n_low:
-            n_high, n_low = n_low, n_high
+    if require_comparison and n_high < n_low:
+        n_high, n_low = n_low, n_high
 
     return (n_low, n_high)
 

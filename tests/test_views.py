@@ -15,8 +15,7 @@ def client(tmp_path):
     app = server.create_app(test_db.as_posix())
     app_context = app.test_request_context()
     app_context.push()
-    client = app.test_client()
-    return client
+    return app.test_client()
 
 
 @pytest.mark.parametrize('disable_favicon', [False, True])
@@ -28,10 +27,11 @@ def test_bookmark_model_view(tmp_path, client, disable_favicon):
         description='randomdesc', id=1, tags='tags1',
         title='Example Domain', url='http://example.com')
     current_app.config['BUKUSERVER_DISABLE_FAVICON'] = disable_favicon
-    img_html = ''
-    if not disable_favicon:
-        img_html = \
-            '<img src="http://www.google.com/s2/favicons?domain=example.com"/> '
+    img_html = (
+        ''
+        if disable_favicon
+        else '<img src="http://www.google.com/s2/favicons?domain=example.com"/> '
+    )
     res = inst._list_entry(None, model, 'Entry')
     exp_res = \
         (
@@ -50,8 +50,7 @@ def tmv_instance(tmp_path):
     """define tag model view instance"""
     test_db = tmp_path / 'test.db'
     bukudb = BukuDb(dbfile=test_db.as_posix())
-    inst = TagModelView(bukudb)
-    return inst
+    return TagModelView(bukudb)
 
 
 def test_tag_model_view_get_list_empty_db(tmv_instance):
@@ -107,8 +106,7 @@ def bmv_instance(tmp_path):
     """define tag model view instance"""
     test_db = tmp_path / 'test.db'
     bukudb = BukuDb(dbfile=test_db.as_posix())
-    inst = BookmarkModelView(bukudb)
-    return inst
+    return BookmarkModelView(bukudb)
 
 
 @pytest.mark.parametrize('url, exp_url', [

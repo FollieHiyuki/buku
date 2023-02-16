@@ -218,7 +218,7 @@ def test_edit_at_prompt(nav, is_editor_valid_retval, edit_rec_retval):
 )
 def test_format_json(field_filter, single_record):
     """test func."""
-    resultset = [['row{}'.format(x) for x in range(5)]]
+    resultset = [[f'row{x}' for x in range(5)]]
     if field_filter == 1:
         marks = {'uri': 'row1'}
     elif field_filter == 2:
@@ -294,13 +294,9 @@ def test_check_upstream_release(status_code, latest_release):
     resp.status = status_code
     m_manager = mock.Mock()
     m_manager.request.return_value = resp
-    with mock.patch('buku.urllib3') as m_urllib3, \
-            mock.patch('buku.print') as m_print:
+    with (mock.patch('buku.urllib3') as m_urllib3, mock.patch('buku.print') as m_print):
         import buku
-        if latest_release:
-            latest_version = 'v{}'.format(buku.__version__)
-        else:
-            latest_version = 'v0'
+        latest_version = f'v{buku.__version__}' if latest_release else 'v0'
         m_urllib3.PoolManager.return_value = m_manager
         resp.data.decode.return_value = json.dumps([{'tag_name': latest_version}])
         buku.check_upstream_release()
@@ -673,7 +669,7 @@ def test_import_html(html_text, exp_res):
     html_soup = BeautifulSoup(html_text, 'html.parser')
     res = list(import_html(html_soup, False, None))
     for item, exp_item in zip(res, exp_res):
-        assert item == exp_item, 'Actual item:\n{}'.format(item)
+        assert item == exp_item, f'Actual item:\n{item}'
 
 
 def test_import_html_and_add_parent():
@@ -720,9 +716,7 @@ def test_copy_to_clipboard(platform, params):
     platform_recognized = \
         platform.startswith(('linux', 'freebsd', 'openbsd')) \
         or platform in ('darwin', 'win32')
-    with mock.patch('buku.sys') as m_sys, \
-            mock.patch('buku.Popen', return_value=m_popen_retval) as m_popen, \
-            mock.patch('buku.shutil.which', return_value=True):
+    with (mock.patch('buku.sys') as m_sys, mock.patch('buku.Popen', return_value=m_popen_retval) as m_popen, mock.patch('buku.shutil.which', return_value=True)):
         m_sys.platform = platform
         from buku import copy_to_clipboard
         import subprocess
@@ -732,7 +726,7 @@ def test_copy_to_clipboard(platform, params):
                 params, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             m_popen_retval.communicate.assert_called_once_with(content)
         else:
-            logging.info('popen is called {} on unrecognized platform'.format(m_popen.call_count))
+            logging.info(f'popen is called {m_popen.call_count} on unrecognized platform')
 
 
 @pytest.mark.parametrize('export_type, exp_res', [
