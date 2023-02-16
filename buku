@@ -182,7 +182,7 @@ class BukuCrypt:
 
         if not dbfile:
             dbfile = os.path.join(BukuDb.get_default_dbdir(), 'bookmarks.db')
-        encfile = dbfile + '.enc'
+        encfile = f'{dbfile}.enc'
 
         db_exists = os.path.exists(dbfile)
         enc_exists = os.path.exists(encfile)
@@ -215,7 +215,7 @@ class BukuCrypt:
 
         # Generate random 256-bit salt and key
         salt = os.urandom(BukuCrypt.SALT_SIZE)
-        key = ('%s%s' % (password, salt.decode('utf-8', 'replace'))).encode('utf-8')
+        key = f"{password}{salt.decode('utf-8', 'replace')}".encode('utf-8')
         for _ in range(iterations):
             key = sha256(key).digest()
 
@@ -288,7 +288,7 @@ class BukuCrypt:
             dbfile = os.path.abspath(dbfile)
             dbpath, filename = os.path.split(dbfile)
 
-        encfile = dbfile + '.enc'
+        encfile = f'{dbfile}.enc'
 
         enc_exists = os.path.exists(encfile)
         db_exists = os.path.exists(dbfile)
@@ -314,7 +314,7 @@ class BukuCrypt:
 
                 # Read 256-bit salt and generate key
                 salt = infp.read(32)
-                key = ('%s%s' % (password, salt.decode('utf-8', 'replace'))).encode('utf-8')
+                key = f"{password}{salt.decode('utf-8', 'replace')}".encode('utf-8')
                 for _ in range(iterations):
                     key = sha256(key).digest()
 
@@ -423,11 +423,10 @@ class BukuDb:
         data_home = os.environ.get('XDG_DATA_HOME')
         if data_home is None:
             if os.environ.get('HOME') is None:
-                if sys.platform == 'win32':
-                    data_home = os.environ.get('APPDATA')
-                    if data_home is None:
-                        return os.path.abspath('.')
-                else:
+                if sys.platform != 'win32':
+                    return os.path.abspath('.')
+                data_home = os.environ.get('APPDATA')
+                if data_home is None:
                     return os.path.abspath('.')
             else:
                 data_home = os.path.join(os.environ.get('HOME'), '.local', 'share')
@@ -470,14 +469,14 @@ class BukuDb:
             os._exit(1)
 
         db_exists = os.path.exists(dbfile)
-        enc_exists = os.path.exists(dbfile + '.enc')
+        enc_exists = os.path.exists(f'{dbfile}.enc')
 
         if db_exists and not enc_exists:
             pass
         elif enc_exists and not db_exists:
             LOGERR('Unlock database first')
             sys.exit(1)
-        elif db_exists and enc_exists:
+        elif db_exists:
             LOGERR('Both encrypted and flat DB files exist!')
             sys.exit(1)
         elif chatty:
@@ -607,7 +606,7 @@ class BukuDb:
         """
 
         # Return error for empty URL
-        if not url or url == '':
+        if not url:
             LOGERR('Invalid URL')
             return -1
 
@@ -689,18 +688,16 @@ class BukuDb:
         else:
             self.cur.execute('SELECT id, tags FROM bookmarks WHERE id = ? LIMIT 1', (index,))
 
-        resultset = self.cur.fetchall()
-        if resultset:
-            query = 'UPDATE bookmarks SET tags = ? WHERE id = ?'
-            for row in resultset:
-                tags = row[1] + tags_in[1:]
-                tags = parse_tags([tags])
-                self.cur.execute(query, (tags, row[0],))
-                if self.chatty and not delay_commit:
-                    self.print_rec(row[0])
-        else:
+        if not (resultset := self.cur.fetchall()):
             return False
 
+        query = 'UPDATE bookmarks SET tags = ? WHERE id = ?'
+        for row in resultset:
+            tags = row[1] + tags_in[1:]
+            tags = parse_tags([tags])
+            self.cur.execute(query, (tags, row[0],))
+            if self.chatty and not delay_commit:
+                self.print_rec(row[0])
         if not delay_commit:
             self.conn.commit()
 
@@ -742,8 +739,7 @@ class BukuDb:
             match = "'%' || ? || '%'"
             for tag in tags_to_delete:
                 tag = delim_wrap(tag)
-                q = ("UPDATE bookmarks SET tags = replace(tags, '%s', '%s') "
-                     "WHERE tags LIKE %s" % (tag, DELIM, match))
+                q = f"UPDATE bookmarks SET tags = replace(tags, '{tag}', '{DELIM}') WHERE tags LIKE {match}"
                 self.cur.execute(q, (tag,))
                 count += self.cur.rowcount
 
@@ -758,24 +754,22 @@ class BukuDb:
         # Use SELECT and UPDATE to handle multiple tags at once
         query = 'SELECT id, tags FROM bookmarks WHERE id = ? LIMIT 1'
         self.cur.execute(query, (index,))
-        resultset = self.cur.fetchall()
-        if resultset:
-            query = 'UPDATE bookmarks SET tags = ? WHERE id = ?'
-            for row in resultset:
-                tags = row[1]
-
-                for tag in tags_to_delete:
-                    tags = tags.replace(delim_wrap(tag), DELIM)
-
-                self.cur.execute(query, (parse_tags([tags]), row[0],))
-                if self.chatty and not delay_commit:
-                    self.print_rec(row[0])
-
-                if not delay_commit:
-                    self.conn.commit()
-        else:
+        if not (resultset := self.cur.fetchall()):
             return False
 
+        query = 'UPDATE bookmarks SET tags = ? WHERE id = ?'
+        for row in resultset:
+            tags = row[1]
+
+            for tag in tags_to_delete:
+                tags = tags.replace(delim_wrap(tag), DELIM)
+
+            self.cur.execute(query, (parse_tags([tags]), row[0],))
+            if self.chatty and not delay_commit:
+                self.print_rec(row[0])
+
+            if not delay_commit:
+                self.conn.commit()
         return True
 
     def update_rec(
@@ -929,7 +923,7 @@ class BukuDb:
 
             query = query[:-1]
         else:
-            query = query[:-1] + ' WHERE id = ?'
+            query = f'{query[:-1]} WHERE id = ?'
             arguments += (index,)
 
         LOGDBG('update_rec query: "%s", args: %s', query, arguments)
@@ -1066,7 +1060,7 @@ class BukuDb:
                     cond.release()
                     continue
 
-                query = query[:-1] + ' WHERE id = ?'
+                query = f'{query[:-1]} WHERE id = ?'
                 arguments += (row[0],)
                 LOGDBG('refreshdb query: "%s", args: %s', query, arguments)
 
@@ -1133,9 +1127,9 @@ class BukuDb:
         if index == -1:
             # Edit the last records
             index = self.get_max_id()
-            if index == -1:
-                LOGERR('Empty database')
-                return False
+        if index == -1:
+            LOGERR('Empty database')
+            return False
 
         rec = self.get_rec_by_id(index)
         if not rec:
@@ -1150,10 +1144,7 @@ class BukuDb:
             url, title, tags, desc = result
             return self.update_rec(index, url, title, tags, desc, immutable)
 
-        if immutable != -1:
-            return self.update_rec(index, immutable)
-
-        return False
+        return self.update_rec(index, immutable) if immutable != -1 else False
 
     def list_using_id(self, ids=[]):
         """List entries in the DB using the specified id list.
@@ -1183,7 +1174,7 @@ class BukuDb:
                         part_ids = list(chain.from_iterable(self.cur.fetchall()))
                     q0 += ','.join(list(map(str, part_ids)))
                 else:
-                    q0 += idx + ','
+                    q0 += f'{idx},'
             q0 = q0.rstrip(',')
             q0 += ')'
 
@@ -1235,20 +1226,20 @@ class BukuDb:
               'desc REGEXP ?) ')
         qargs = []  # type: List[Any]
 
-        case_statement = lambda x: 'CASE WHEN ' + x + ' THEN 1 ELSE 0 END'
+        case_statement = lambda x: f'CASE WHEN {x} THEN 1 ELSE 0 END'
         if regex:
             q0 = 'SELECT id, url, metadata, tags, desc, flags FROM (SELECT *, '
             for token in keywords:
                 if not token:
                     continue
 
-                q0 += case_statement(q2) + ' + '
+                q0 += f'{case_statement(q2)} + '
                 qargs += (token, token, token, token,)
 
             if not qargs:
                 return None
 
-            q0 = q0[:-3] + ' AS score FROM bookmarks WHERE score > 0 ORDER BY score DESC)'
+            q0 = f'{q0[:-3]} AS score FROM bookmarks WHERE score > 0 ORDER BY score DESC)'
         elif all_keywords:
             if len(keywords) == 1 and keywords[0] == 'blank':
                 q0 = "SELECT * FROM bookmarks WHERE metadata = '' OR tags = ? "
@@ -1262,7 +1253,7 @@ class BukuDb:
                         continue
 
                     if deep:
-                        q0 += q1 + 'AND '
+                        q0 += f'{q1}AND '
                     else:
                         _pre = _post = ''
                         if str.isalnum(token[0]):
@@ -1270,7 +1261,7 @@ class BukuDb:
                         if str.isalnum(token[-1]):
                             _post = '\\b'
                         token = _pre + re.escape(token.rstrip('/')) + _post
-                        q0 += q2 + 'AND '
+                        q0 += f'{q2}AND '
 
                     qargs += (token, token, token, token,)
 
@@ -1279,14 +1270,14 @@ class BukuDb:
 
                 q0 = q0[:-4]
             q0 += 'ORDER BY id ASC'
-        elif not all_keywords:
+        else:
             q0 = 'SELECT id, url, metadata, tags, desc, flags FROM (SELECT *, '
             for token in keywords:
                 if not token:
                     continue
 
                 if deep:
-                    q0 += case_statement(q1) + ' + '
+                    q0 += f'{case_statement(q1)} + '
                 else:
                     _pre = _post = ''
                     if str.isalnum(token[0]):
@@ -1294,18 +1285,14 @@ class BukuDb:
                     if str.isalnum(token[-1]):
                         _post = '\\b'
                     token = _pre + re.escape(token.rstrip('/')) + _post
-                    q0 += case_statement(q2) + ' + '
+                    q0 += f'{case_statement(q2)} + '
 
                 qargs += (token, token, token, token,)
 
             if not qargs:
                 return None
 
-            q0 = q0[:-3] + ' AS score FROM bookmarks WHERE score > 0 ORDER BY score DESC)'
-        else:
-            LOGERR('Invalid search option')
-            return None
-
+            q0 = f'{q0[:-3]} AS score FROM bookmarks WHERE score > 0 ORDER BY score DESC)'
         LOGDBG('query: "%s", args: %s', q0, qargs)
 
         try:
@@ -1350,8 +1337,8 @@ class BukuDb:
         if search_operator == 'AND':
             query = ("SELECT id, url, metadata, tags, desc, flags FROM bookmarks "
                      "WHERE tags LIKE '%' || ? || '%' ")
-            for tag in tags_[1:]:
-                query += "{} tags LIKE '%' || ? || '%' ".format(search_operator)
+            for _ in tags_[1:]:
+                query += f"{search_operator} tags LIKE '%' || ? || '%' "
 
             if excluded_tags:
                 tags_.append(excluded_tags)
@@ -1359,12 +1346,10 @@ class BukuDb:
                 query += ') AND tags NOT REGEXP ? '
             query += 'ORDER BY id ASC'
         else:
-            query = 'SELECT id, url, metadata, tags, desc, flags FROM (SELECT *, '
             case_statement = "CASE WHEN tags LIKE '%' || ? || '%' THEN 1 ELSE 0 END"
-            query += case_statement
-
-            for tag in tags_[1:]:
-                query += ' + ' + case_statement
+            query = f'SELECT id, url, metadata, tags, desc, flags FROM (SELECT *, {case_statement}'
+            for _ in tags_[1:]:
+                query += f' + {case_statement}'
 
             query += ' AS score FROM bookmarks WHERE score > 0'
 
@@ -1456,14 +1441,14 @@ class BukuDb:
         if max_id == -1:
             return
 
-        query1 = 'SELECT id, URL, metadata, tags, desc, flags FROM bookmarks WHERE id = ? LIMIT 1'
-        query2 = 'DELETE FROM bookmarks WHERE id = ?'
-        query3 = 'INSERT INTO bookmarks(id, URL, metadata, tags, desc, flags) VALUES (?, ?, ?, ?, ?, ?)'
-
         # NOOP if the just deleted index was the last one
         if max_id > index:
+            query1 = 'SELECT id, URL, metadata, tags, desc, flags FROM bookmarks WHERE id = ? LIMIT 1'
             self.cur.execute(query1, (max_id,))
             results = self.cur.fetchall()
+            query2 = 'DELETE FROM bookmarks WHERE id = ?'
+            query3 = 'INSERT INTO bookmarks(id, URL, metadata, tags, desc, flags) VALUES (?, ?, ?, ?, ?, ?)'
+
             for row in results:
                 self.cur.execute(query2, (row[0],))
                 self.cur.execute(query3, (index, row[1], row[2], row[3], row[4], row[5]))
@@ -1870,11 +1855,7 @@ class BukuDb:
         if not tags:
             return tags, dic
 
-        if tags[0] == '':
-            unique_tags = sorted(tags[1:])
-        else:
-            unique_tags = sorted(tags)
-
+        unique_tags = sorted(tags[1:]) if tags[0] == '' else sorted(tags)
         return unique_tags, dic
 
     def suggest_similar_tag(self, tagstr):
@@ -1901,7 +1882,7 @@ class BukuDb:
             if tag == '':
                 continue
 
-            self.cur.execute(qry, ('%' + delim_wrap(tag) + '%',))
+            self.cur.execute(qry, (f'%{delim_wrap(tag)}%', ))
             results = self.cur.fetchall()
             for row in results:
                 # update tagset with unique tags in row
@@ -1968,9 +1949,8 @@ class BukuDb:
 
         # Update bookmarks with original tag
         query = 'SELECT id, tags FROM bookmarks WHERE tags LIKE ?'
-        self.cur.execute(query, ('%' + orig + '%',))
-        results = self.cur.fetchall()
-        if results:
+        self.cur.execute(query, (f'%{orig}%', ))
+        if results := self.cur.fetchall():
             query = 'UPDATE bookmarks SET tags = ? WHERE id = ?'
             for row in results:
                 tags = row[1].replace(orig, newtags)
@@ -2084,16 +2064,24 @@ class BukuDb:
                         vals[0], vals[-1] = vals[-1], vals[0]
 
                     for _id in range(vals[0], vals[-1] + 1):
-                        if flag == 1:
-                            if self.append_tag_at_index(_id, tags, True):
-                                update_count += 1
-                        elif flag == 2:
+                        if (
+                            flag == 1
+                            and self.append_tag_at_index(_id, tags, True)
+                            or flag != 1
+                            and flag != 2
+                            and self.delete_tag_at_index(_id, tags, True)
+                        ):
+                            update_count += 1
+                        elif (
+                            flag != 1 or self.append_tag_at_index(_id, tags, True)
+                        ) and (
+                            flag == 1
+                            or flag == 2
+                            or self.delete_tag_at_index(_id, tags, True)
+                        ):
                             tags = parse_tags([tags])
                             self.cur.execute(query, (tags, _id,))
                             update_count += self.cur.rowcount
-                        else:
-                            if self.delete_tag_at_index(_id, tags, True):
-                                update_count += 1
                 else:
                     return -1
         except ValueError:
@@ -2210,12 +2198,12 @@ class BukuDb:
 
         if not resultset:
             resultset = self.get_rec_all()
-            if not resultset:
-                print('No records found')
-                return False
+        if not resultset:
+            print('No records found')
+            return False
 
         if os.path.exists(filepath):
-            resp = read_in(filepath + ' exists. Overwrite? (y/n): ')
+            resp = read_in(f'{filepath} exists. Overwrite? (y/n): ')
             if resp != 'y':
                 return False
 
@@ -2230,24 +2218,20 @@ class BukuDb:
                 count += 1
             outdb.conn.commit()
             outdb.close()
-            print('%s exported' % count)
+            print(f'{count} exported')
             return True
 
         with open(filepath, mode='w', encoding='utf-8') as outfp:
             res = {}  # type: Dict
             if filepath.endswith('.md'):
                 res = convert_bookmark_set(resultset, 'markdown')
-                count += res['count']
-                outfp.write(res['data'])
             elif filepath.endswith('.org'):
                 res = convert_bookmark_set(resultset, 'org')
-                count += res['count']
-                outfp.write(res['data'])
             else:
                 res = convert_bookmark_set(resultset, 'html')
-                count += res['count']
-                outfp.write(res['data'])
-            print('%s exported' % count)
+            count += res['count']
+            outfp.write(res['data'])
+            print(f'{count} exported')
             return True
         return False
 
@@ -2273,13 +2257,13 @@ class BukuDb:
 
         for item in sublist:
             if item['type'] == 'folder':
-                next_folder_name = folder_name + ',' + item['name']
-                for i in self.traverse_bm_folder(
-                        item['children'],
-                        unique_tag,
-                        next_folder_name,
-                        add_parent_folder_as_tag):
-                    yield i
+                next_folder_name = f'{folder_name},' + item['name']
+                yield from self.traverse_bm_folder(
+                    item['children'],
+                    unique_tag,
+                    next_folder_name,
+                    add_parent_folder_as_tag,
+                )
             elif item['type'] == 'url':
                 try:
                     if is_nongeneric_url(item['url']):
@@ -2336,36 +2320,37 @@ class BukuDb:
         """
 
         # Connect to input DB
-        conn = sqlite3.connect('file:%s?mode=ro' % path, uri=True)
+        conn = sqlite3.connect(f'file:{path}?mode=ro', uri=True)
 
         cur = conn.cursor()
         res = cur.execute('SELECT DISTINCT fk, parent, title FROM moz_bookmarks WHERE type=1')
         # get id's and remove duplicates
         for row in res.fetchall():
             # get the url
-            res = cur.execute('SELECT url FROM moz_places where id={}'.format(row[0]))
+            res = cur.execute(f'SELECT url FROM moz_places where id={row[0]}')
             url = res.fetchone()[0]
             if is_nongeneric_url(url):
                 continue
 
             # get tags
-            res = cur.execute('SELECT parent FROM moz_bookmarks WHERE '
-                              'fk={} AND title IS NULL'.format(row[0]))
+            res = cur.execute(
+                f'SELECT parent FROM moz_bookmarks WHERE fk={row[0]} AND title IS NULL'
+            )
             bm_tag_ids = [tid for item in res.fetchall() for tid in item]
 
             bookmark_tags = []
             for bm_tag_id in bm_tag_ids:
-                res = cur.execute('SELECT title FROM moz_bookmarks WHERE id={}'.format(bm_tag_id))
+                res = cur.execute(f'SELECT title FROM moz_bookmarks WHERE id={bm_tag_id}')
                 bookmark_tags.append(res.fetchone()[0])
 
             if add_parent_folder_as_tag:
                 # add folder name
                 parent_id = row[1]
                 while parent_id:
-                    res = cur.execute('SELECT title,parent FROM moz_bookmarks '
-                                      'WHERE id={}'.format(parent_id))
-                    parent = res.fetchone()
-                    if parent:
+                    res = cur.execute(
+                        f'SELECT title,parent FROM moz_bookmarks WHERE id={parent_id}'
+                    )
+                    if parent := res.fetchone():
                         title, parent_id = parent
                         bookmark_tags.append(title)
 
@@ -2377,11 +2362,7 @@ class BukuDb:
             tags = parse_tags(formatted_tags)
 
             # get the title
-            if row[2]:
-                title = row[2]
-            else:
-                title = ''
-
+            title = row[2] or ''
             self.add_rec(url, title, tags, None, 0, True, False)
         try:
             cur.close()
@@ -2407,39 +2388,30 @@ class BukuDb:
             cb_bm_db_path = '~/.config/chromium/Default/Bookmarks'
 
             default_ff_folder = os.path.expanduser('~/.mozilla/firefox')
-            profile = get_firefox_profile_name(default_ff_folder)
-            if profile:
-                ff_bm_db_path = '~/.mozilla/firefox/{}/places.sqlite'.format(profile)
+            if profile := get_firefox_profile_name(default_ff_folder):
+                ff_bm_db_path = f'~/.mozilla/firefox/{profile}/places.sqlite'
         elif sys.platform == 'darwin':
             gc_bm_db_path = '~/Library/Application Support/Google/Chrome/Default/Bookmarks'
             cb_bm_db_path = '~/Library/Application Support/Chromium/Default/Bookmarks'
 
             default_ff_folder = os.path.expanduser('~/Library/Application Support/Firefox')
-            profile = get_firefox_profile_name(default_ff_folder)
-            if profile:
-                ff_bm_db_path = ('~/Library/Application Support/Firefox/'
-                                 '{}/places.sqlite'.format(profile))
+            if profile := get_firefox_profile_name(default_ff_folder):
+                ff_bm_db_path = f'~/Library/Application Support/Firefox/{profile}/places.sqlite'
         elif sys.platform == 'win32':
             username = os.getlogin()
-            gc_bm_db_path = ('C:/Users/{}/AppData/Local/Google/Chrome/User Data/'
-                             'Default/Bookmarks'.format(username))
-            cb_bm_db_path = ('C:/Users/{}/AppData/Local/Chromium/User Data/'
-                             'Default/Bookmarks'.format(username))
+            gc_bm_db_path = f'C:/Users/{username}/AppData/Local/Google/Chrome/User Data/Default/Bookmarks'
+            cb_bm_db_path = f'C:/Users/{username}/AppData/Local/Chromium/User Data/Default/Bookmarks'
 
-            default_ff_folder = 'C:/Users/{}/AppData/Roaming/Mozilla/Firefox/'.format(username)
-            profile = get_firefox_profile_name(default_ff_folder)
-            if profile:
-                ff_bm_db_path = os.path.join(default_ff_folder, '{}/places.sqlite'.format(profile))
+            default_ff_folder = f'C:/Users/{username}/AppData/Roaming/Mozilla/Firefox/'
+            if profile := get_firefox_profile_name(default_ff_folder):
+                ff_bm_db_path = os.path.join(default_ff_folder, f'{profile}/places.sqlite')
         else:
-            LOGERR('buku does not support {} yet'.format(sys.platform))
+            LOGERR(f'buku does not support {sys.platform} yet')
             self.close_quit(1)
 
         if self.chatty:
             resp = input('Generate auto-tag (YYYYMonDD)? (y/n): ')
-            if resp == 'y':
-                newtag = gen_auto_tag()
-            else:
-                newtag = None
+            newtag = gen_auto_tag() if resp == 'y' else None
             resp = input('Add parent folder names as tags? (y/n): ')
         else:
             newtag = None
@@ -2528,10 +2500,7 @@ class BukuDb:
         elif filepath.endswith('org'):
             items = import_org(filepath=filepath, newtag=newtag)
         elif filepath.endswith('json'):
-            if not tacit:
-                resp = input('Add parent folder names as tags? (y/n): ')
-            else:
-                resp = 'y'
+            resp = 'y' if tacit else input('Add parent folder names as tags? (y/n): ')
             add_bookmark_folder_as_tag = (resp == 'y')
             try:
                 with open(filepath, 'r', encoding='utf-8') as datafile:
@@ -2539,7 +2508,7 @@ class BukuDb:
 
                 items = import_firefox_json(data, add_bookmark_folder_as_tag, newtag)
             except ValueError as e:
-                LOGERR("ff_json: JSON Decode Error: {}".format(e))
+                LOGERR(f"ff_json: JSON Decode Error: {e}")
                 return False
             except Exception as e:
                 LOGERR(e)
@@ -2555,11 +2524,7 @@ class BukuDb:
                 LOGERR(e)
                 return False
 
-            if not tacit:
-                resp = input('Add parent folder names as tags? (y/n): ')
-            else:
-                resp = 'y'
-
+            resp = 'y' if tacit else input('Add parent folder names as tags? (y/n): ')
             add_parent_folder_as_tag = (resp == 'y')
             items = import_html(soup, add_parent_folder_as_tag, newtag)
             infp.close()

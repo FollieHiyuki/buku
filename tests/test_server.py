@@ -27,8 +27,7 @@ def test_cli(args, word):
 def client(tmp_path):
     test_db = tmp_path / 'test.db'
     app = server.create_app(test_db.as_posix())
-    client = app.test_client()
-    return client
+    return app.test_client()
 
 
 def test_home(client):

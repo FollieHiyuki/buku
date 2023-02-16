@@ -10,7 +10,7 @@ if os.path.isfile('buku'):
     shutil.copyfile('buku', 'buku.py')
 
 with open('buku.py', encoding='utf-8') as f:
-    version = re.search('__version__ = \'([^\']+)\'', f.read()).group(1)  # type: ignore
+    version = re.search('__version__ = \'([^\']+)\'', f.read())[1]
 
 with open('README.md', encoding='utf-8') as f:
     long_description = f.read()
